@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+
+##############################################################################
+##
+##  Symfony security:check for packages with known vulnerabilities
+##  and framework version support check
+##
+##############################################################################
+
+path='/path/to/symfony/root'
+
+old_path=`pwd`
+exitStatus=0
+cd $path
+
+versionString=`$path/bin/console --version`
+version=`echo $versionString | cut -d " " -f 2`
+
+securityCheck=`$path/bin/console security:check`
+securityCheckExitStatus=$?
+
+echo "-------------------------"
+echo "Version check"
+echo "-------------------------"
+echo
+echo "Version is:" $version
+
+is_eomed=$(curl -Ls "https://symfony.com/roadmap.json?version=$version" | python -c "import sys, json; print json.load(sys.stdin)['is_eomed']")
+is_eoled=$(curl -Ls "https://symfony.com/roadmap.json?version=$version" | python -c "import sys, json; print json.load(sys.stdin)['is_eoled']")
+eol=$(curl -Ls "https://symfony.com/roadmap.json?version=$version" | python -c "import sys, json; print json.load(sys.stdin)['eol']")
+eom=$(curl -Ls "https://symfony.com/roadmap.json?version=$version" | python -c "import sys, json; print json.load(sys.stdin)['eom']")
+
+
+if [ $is_eomed = "True" ]
+then
+    echo
+    echo "  [Warning] Current version is no longer supported for bug fixes."
+fi
+if [ $is_eoled = "True" ]
+then
+    echo
+    echo "  [Alert] Current version is no longer supported for security fixes."
+    exitStatus=1
+fi
+
+echo
+echo "Current version is supported until $eom for bug fixes and until $eol for security fixes"
+
+echo
+echo "----------------------------------------"
+echo "security:check for packages"
+echo "----------------------------------------"
+echo
+
+if [ $securityCheckExitStatus -ne 0 ]
+then
+    echo "  [Alert] Test failed!"
+    echo $securityCheck
+    exitStatus=1
+else
+    echo "Test passed."
+    echo "No packages with known vulnerabilities found."
+fi
+
+
+cd $old_path
+exit $exitStatus
